@@ -1,58 +1,56 @@
-import java.io.*;
-import java.net.*;
+import java.io.IOException;
 import java.util.*;
+import java.util.logging.Logger;
+import java.util.logging.Level;
+import java.util.logging.FileHandler;
+import java.util.logging.SimpleFormatter;
 
 public class GopherIndexer {
-    private String server;
-    private int port;
-    private Set<String> visited;
-    private List<String> textFiles;
-    private List<String> binaryFiles;
+    private final String hostname;
+    private final int port;
+    private final Set<String> visited;
+    private final List<String> textFiles;
+    private final List<String> binaryFiles;
     private long largestTextFileSize = 0;
     private String smallestTextFileContents = null;
     private long smallestTextFileSize = Long.MAX_VALUE;
     private long smallestBinaryFileSize = Long.MAX_VALUE;
     private long largestBinaryFileSize = 0;
+    private static final Logger logger = Logger.getLogger(GopherIndexer.class.getName());
+    private final ConnectionHandler connectionHandler = new ConnectionHandler();
 
-    public GopherIndexer(String server, int port) {
-        this.server = server;
+    public GopherIndexer(String hostname, int port) {
+        this.hostname = hostname;
         this.port = port;
         this.visited = new HashSet<>();
         this.textFiles = new ArrayList<>();
         this.binaryFiles = new ArrayList<>();
     }
 
-    private String fetchFromGopher(String selector) throws IOException {
-        Socket socket = new Socket(server, port);
-        PrintWriter out = new PrintWriter(socket.getOutputStream(), true);
-        BufferedReader in = new BufferedReader(new InputStreamReader(socket.getInputStream()));
-
-        // Send the selector followed by a carriage return and newline
-        out.println(selector + "\r\n");
-
-        // Read the response
-        StringBuilder response = new StringBuilder();
-        String line;
-        while ((line = in.readLine()) != null) {
-            response.append(line).append("\n");
+    public String fetchFromGopher(String hostname, int port, String selector) {
+        try {
+            connectionHandler.connect(hostname, port);
+            return connectionHandler.sendRequest(selector);
+        } catch (IOException e) {
+            logger.log(Level.SEVERE, "Failed to connect to " + hostname + ":" + port, e);
+            return null;
+        } finally {
+            try {
+                connectionHandler.disconnect();
+            } catch (IOException e) {
+                logger.log(Level.SEVERE, "Failed to disconnect from " + hostname + ":" + port, e);
+            }
         }
-
-        // Close connections
-        in.close();
-        out.close();
-        socket.close();
-
-        return response.toString();
     }
 
     public void recursiveFetch(String selector, String path) throws IOException {
-        String resourceKey = server + ":" + port + selector;
+        String resourceKey = hostname + ":" + port + selector;
         if (visited.contains(resourceKey)) {
             return;
         }
         visited.add(resourceKey);
 
-        String data = fetchFromGopher(selector);
+        String data = fetchFromGopher(hostname, port, selector);
         System.out.println("Fetching: " + new Date() + " - " + selector);
 
         String[] lines = data.split("\n");
@@ -67,7 +65,7 @@ public class GopherIndexer {
                 int newPort = Integer.parseInt(parts[3]);
                 String fullPath = path + "/" + displayString;
 
-                if (!hostname.equals(this.server) || newPort != this.port) {
+                if (!hostname.equals(this.hostname) || newPort != this.port) {
                     continue; // Skip external servers
                 } else if ("1".equals(type)) {
                     recursiveFetch(newSelector, fullPath);
@@ -110,12 +108,27 @@ public class GopherIndexer {
     }
 
     public static void main(String[] args) {
-        GopherIndexer indexer = new GopherIndexer("comp3310.ddns.net", 70);
+        setupLogger();
+        String hostname = "comp3310.ddns.net";
+        int port = 70;
+
+        GopherIndexer indexer = new GopherIndexer(hostname, port);
+
         try {
             indexer.recursiveFetch("", "/");
             indexer.printStatistics();
         } catch (IOException e) {
-            System.err.println("Error during Gopher indexing: " + e.getMessage());
+            logger.log(Level.SEVERE, "Exception occurred", e);
+        }
+    }
+
+    private static void setupLogger() {
+        try {
+            FileHandler fh = new FileHandler("GopherIndexer.log", true);
+            logger.addHandler(fh);
+            fh.setFormatter(new SimpleFormatter());
+        } catch (java.io.IOException e) {
+            logger.log(Level.SEVERE, "File logger not working.", e);
         }
     }
 }

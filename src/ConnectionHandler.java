@@ -19,7 +19,8 @@ public class ConnectionHandler {
     }
 
     public String sendRequest(String request) throws IOException {
-        out.println(request);
+        out.print(request+"\r\n");
+        out.flush(); // Explicitly flush to ensure no extra data
         StringBuilder response = new StringBuilder();
         String line;
         while ((line = in.readLine()) != null) {
