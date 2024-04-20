@@ -3,8 +3,8 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.net.SocketTimeoutException;
 import java.nio.file.Paths;
+import java.rmi.server.LoaderHandler;
 import java.util.*;
-import java.util.logging.Logger;
 import java.util.logging.Level;
 import java.util.logging.FileHandler;
 import java.util.logging.SimpleFormatter;
@@ -32,10 +32,6 @@ public class GopherIndexer {
     private static final String DOWNLOAD_DIRECTORY = "downloaded_files/";
 
     private final ConnectionHandler connectionHandler = new ConnectionHandler();
-    private static final Logger logger = Logger.getLogger(GopherIndexer.class.getName());
-    static {
-        LoggingSetup.configureLogger(logger);
-    }
 
     public GopherIndexer(String hostname) {
         this.hostname = hostname;
@@ -92,7 +88,7 @@ public class GopherIndexer {
             Files.write(path, data.getBytes(), StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
             return Files.size(path); // Return the size of the file
         } catch (IOException e) {
-            logger.log(Level.SEVERE, "Failed to write file: " + filePath);
+            Logger.severe("Failed to write file: " + filePath);
             return 0; // In case of error, return 0
         }
     }
@@ -108,7 +104,7 @@ public class GopherIndexer {
             Files.write(path, data, StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
             return Files.size(path); // Return the size of the file
         } catch (IOException e) {
-            logger.log(Level.SEVERE, "Failed to write file: " + filePath);
+            Logger.severe("Failed to write file: " + filePath);
             return 0; // In case of error, return 0
         }
     }
@@ -119,17 +115,17 @@ public class GopherIndexer {
             connectionHandler.connect(hostname, port);
             return connectionHandler.sendRequest(selector);
         } catch(SocketTimeoutException e){
-            logger.log(Level.WARNING, "Timeout occurred while connecting to or reading from " + hostname + ":" + port + " [" + e.getMessage() + "]");
+            Logger.severe("Timeout occurred while connecting to or reading from " + hostname + ":" + port + " [" + e.getMessage() + "]");
             this.numBadFiles++;
             return null;
         }catch (IOException e) {
-            logger.log(Level.SEVERE, "Failed to connect to " + hostname + ":" + port + " [" + e.getMessage() + "]");
+            Logger.severe("Failed to connect to " + hostname + ":" + port + " [" + e.getMessage() + "]");
             return null;
         } finally {
             try {
                 connectionHandler.disconnect();
             } catch (IOException e) {
-                logger.log(Level.SEVERE, "Failed to disconnect from " + hostname + ":" + port + " [" + e.getMessage() + "]");
+                Logger.severe("Failed to disconnect from " + hostname + ":" + port + " [" + e.getMessage() + "]");
             }
         }
     }
@@ -150,17 +146,17 @@ public class GopherIndexer {
             buffer.flush();
             return buffer.toByteArray();
         } catch(SocketTimeoutException e){
-            logger.log(Level.WARNING, "Timeout occurred while connecting to or reading from " + hostname + ":" + port + " [" + e.getMessage() + "]");
+            Logger.severe("Timeout occurred while connecting to or reading from " + hostname + ":" + port + " [" + e.getMessage() + "]");
             this.numBadFiles++;
             return null;
         } catch (IOException e) {
-            logger.log(Level.SEVERE, "Failed to connect to " + hostname + ":" + port + " [" + e.getMessage() + "]");
+            Logger.severe("Failed to connect to " + hostname + ":" + port + " [" + e.getMessage() + "]");
             return null;
         } finally {
             try {
                 connectionHandler.disconnect();
             } catch (IOException e) {
-                logger.log(Level.SEVERE, "Failed to disconnect from " + hostname + ":" + port + " [" + e.getMessage() + "]");
+                Logger.severe("Failed to disconnect from " + hostname + ":" + port + " [" + e.getMessage() + "]");
             }
         }
     }
@@ -176,7 +172,7 @@ public class GopherIndexer {
             try {
                 connectionHandler.disconnect();
             } catch (IOException e) {
-                logger.log(Level.SEVERE, "Failed to disconnect from " + hostname + ":" + port + " [" + e.getMessage() + "]");
+                Logger.severe("Failed to disconnect from " + hostname + ":" + port + " [" + e.getMessage() + "]");
             }
         }
     }
@@ -192,7 +188,7 @@ public class GopherIndexer {
 
         String data = fetchFromGopher(hostname, port, selector);
         if (data == null || data.isEmpty()) {
-            logger.log(Level.WARNING, "Empty or null response received for selector: " + selector);
+            Logger.warning("Empty or null response received for selector: " + selector);
             return; // Skip processing this resource
         }
 
@@ -201,7 +197,7 @@ public class GopherIndexer {
             if (!line.contains("\t")) continue;
             String[] parts = line.split("\t");
             if (parts.length < 4) {  // Ensure there are enough parts to process without error
-                logger.log(Level.WARNING, "Incorrectly formatted line: " + line);
+                Logger.warning("Incorrectly formatted data line: " + line);
                 continue;
             }
             String type = parts[0].substring(0, 1);
@@ -211,7 +207,7 @@ public class GopherIndexer {
             try {
                 newPort = Integer.parseInt(parts[3]);
             } catch (NumberFormatException e) {
-                logger.log(Level.SEVERE, "Failed to parse port number: " + parts[3]);
+                Logger.severe("Failed to parse port number: " + parts[3]);
                 continue; // Skip this entry
             }
             // Change here to use newSelector instead of displayString for fullPath
@@ -237,7 +233,7 @@ public class GopherIndexer {
                     System.out.println("Fetching: " + new Date() + " - " + newHostname + ":" + newPort + newSelector);
                     String downloadData = fetchFromGopher(newHostname, newPort, newSelector);
                     if (downloadData == null || downloadData.isEmpty()) {
-                        logger.log(Level.WARNING, "Empty or null response received for selector: " + selector);
+                        Logger.warning("Empty or null response received for selector: " + selector);
                     }
 
                     if( downloadData != null){
@@ -256,7 +252,7 @@ public class GopherIndexer {
                             if (size > largestTextFileSize) {
                                 largestTextFileSize = size;
                             }
-                            logger.log(Level.INFO, "File downloaded and saved: " + fullPath + " (Size: " + size + " bytes)");
+                            Logger.info("File downloaded and saved: " + fullPath + " (Size: " + size + " bytes)");
                         }
                     }
                 }
@@ -265,7 +261,7 @@ public class GopherIndexer {
                     System.out.println("Fetching: " + new Date() + " - " + newHostname + ":" + newPort + newSelector);
                     byte[] downloadData = fetchBinaryFromGopher(newHostname, newPort, newSelector);
                     if (downloadData == null ) {
-                        logger.log(Level.WARNING, "Empty or null response received for selector: " + selector);
+                        Logger.warning("Empty or null response received for selector: " + selector);
                     } else {
                         long size = downloadFile(downloadData, fullPath);
                         if (size > 0){
@@ -275,7 +271,7 @@ public class GopherIndexer {
                             if (size > largestBinaryFileSize) {
                                 largestBinaryFileSize = size;
                             }
-                            logger.log(Level.INFO, "File downloaded and saved: " + fullPath + " (Size: " + size + " bytes)");
+                            Logger.info("File downloaded successfully: " + fullPath + " (Size: " + size + " bytes)");
                         }
                     }
                 }
@@ -301,7 +297,6 @@ public class GopherIndexer {
     }
 
     public static void main(String[] args) {
-        setupLogger();
         String hostname = "comp3310.ddns.net";
         int port = 70;
 
@@ -311,17 +306,7 @@ public class GopherIndexer {
             indexer.recursiveFetch(hostname, port, "", "");
             indexer.printStatistics();
         } catch (IOException e) {
-            logger.log(Level.SEVERE, "Exception occurred" + " [" + e.getMessage() + "]");
-        }
-    }
-
-    private static void setupLogger() {
-        try {
-            FileHandler fh = new FileHandler("GopherIndexer.log", true);
-            logger.addHandler(fh);
-            fh.setFormatter(new SimpleFormatter());
-        } catch (java.io.IOException e) {
-            logger.log(Level.SEVERE, "File logger not working." + " [" + e.getMessage() + "]");
+            Logger.severe("Exception occurred" + " [" + e.getMessage() + "]");
         }
     }
 }
