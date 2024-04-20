@@ -5,6 +5,7 @@ public class ConnectionHandler {
     private Socket socket;
     private PrintWriter out;
     private BufferedReader in;
+    private InputStream rawIn; // for binary
 
     // Constants for timeout and retries
     private static final int CONNECTION_TIMEOUT = 2000; // 2 seconds
@@ -21,10 +22,12 @@ public class ConnectionHandler {
                 socket.connect(new InetSocketAddress(host, port), CONNECTION_TIMEOUT);
                 // Set the read timeout to define how long to wait for data once connected
                 socket.setSoTimeout(READ_TIMEOUT);
-                // Set up the output stream
+
+                // Initialize the output and input streams
                 out = new PrintWriter(socket.getOutputStream(), true);
-                // Set up the input stream
-                in = new BufferedReader(new InputStreamReader(socket.getInputStream()));
+                rawIn = socket.getInputStream();  // Store the raw input stream
+                in = new BufferedReader(new InputStreamReader(rawIn)); // Continue to initialize the buffered reader
+
                 return; // Successful connection, exit the method
             } catch (IOException e) {
                 lastException = e;
@@ -56,21 +59,30 @@ public class ConnectionHandler {
     }
 
     public String sendRequest(String request) throws IOException {
-        out.print(request+"\r\n");
-        out.flush(); // Explicitly flush to ensure no extra data
+        out.print(request + "\r\n");
+        out.flush();  // Ensure that all data is sent to the server
+
         StringBuilder response = new StringBuilder();
         String line;
+        final int MAX_RESPONSE_SIZE = 1024 * 1024; // 1MB limit
+        int responseSize = 0;
 
-        final int MAX_LINES = 50; // Maximum lines
-        int lineCount = 0;
-
-        while ((line = in.readLine()) != null && lineCount < MAX_LINES) {
+        while ((line = in.readLine()) != null) {
+            if (responseSize + line.getBytes().length > MAX_RESPONSE_SIZE) {
+                throw new IOException("Response size exceeds the maximum limit of " + MAX_RESPONSE_SIZE + " bytes");
+            }
             response.append(line).append("\n");
-            lineCount++;
+            responseSize += line.getBytes().length; // Update the response size
         }
-        if (lineCount >= MAX_LINES) {
-            throw new IOException("Too many lines in response");
-        }
+
         return response.toString();
+    }
+
+    public InputStream getRawInputStream() {
+        return rawIn;  // Return the InputStream for binary data
+    }
+
+    public PrintWriter getOutputStream() {
+        return out;
     }
 }

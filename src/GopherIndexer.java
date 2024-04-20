@@ -1,3 +1,5 @@
+
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.net.SocketTimeoutException;
 import java.nio.file.Paths;
@@ -9,6 +11,8 @@ import java.util.logging.SimpleFormatter;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 
 public class GopherIndexer {
     private final String hostname;
@@ -24,6 +28,9 @@ public class GopherIndexer {
     private long numExternalServerDown = 0;
     private long numBadFiles = 0;
 
+    private static final int MAX_FILENAME_LENGTH = 63;
+    private static final String DOWNLOAD_DIRECTORY = "downloaded_files/";
+
     private final ConnectionHandler connectionHandler = new ConnectionHandler();
     private static final Logger logger = Logger.getLogger(GopherIndexer.class.getName());
     static {
@@ -37,20 +44,68 @@ public class GopherIndexer {
         this.binaryFiles = new ArrayList<>();
     }
 
-    private long downloadFile(String hostname, int port, String selector, String filePath) {
-        String data = fetchFromGopher(hostname, port, selector);
-        if (data == null || data.isEmpty()) {
-            logger.log(Level.WARNING, "Empty or null response received for selector: " + selector);
-            return 0; // No data to write, return 0
+    private static String bytesToHex(byte[] bytes) {
+        StringBuilder sb = new StringBuilder();
+        for (byte b : bytes) {
+            sb.append(String.format("%02x", b));
         }
+        return sb.toString();
+    }
 
+    private String generateSafeFilePath(String fullPath) {
+        try {
+            // Sanitize the string to remove unwanted characters
+            String safePath = fullPath.replaceAll("[^a-zA-Z0-9.-]", "_");
+
+            // Truncate if necessary to prevent excessively long filenames
+            if (safePath.length() > MAX_FILENAME_LENGTH) {
+                String extension = ""; // Assuming an extension could be in the path, like .txt or .bin
+                int dotIndex = safePath.lastIndexOf('.');
+                if (dotIndex > 0) {
+                    extension = safePath.substring(dotIndex);
+                    safePath = safePath.substring(0, dotIndex);
+                }
+
+                // Hash the original path to append as a unique identifier to prevent collisions
+                MessageDigest digest = MessageDigest.getInstance("SHA-256");
+                byte[] hashBytes = digest.digest(fullPath.getBytes());
+                String hash = bytesToHex(hashBytes).substring(0, 8); // Short hash to keep overall length under control
+
+                // Append hash and ensure total length including extension doesn't exceed max
+                safePath = safePath.substring(0, Math.min(safePath.length(), MAX_FILENAME_LENGTH - hash.length() - extension.length())) + hash + extension;
+            }
+
+            return Paths.get(DOWNLOAD_DIRECTORY, safePath).toString();
+        } catch (NoSuchAlgorithmException e) {
+            throw new RuntimeException("Failed to hash path due to missing algorithm.", e);
+        }
+    }
+
+    private long downloadFile(String data, String filePath) {
         try {
             // Ensure directory path exists before writing the file
-            Path path = Paths.get(filePath);
+            String safeFilePath = generateSafeFilePath(filePath);
+            Path path = Paths.get(safeFilePath);
             Files.createDirectories(path.getParent());
 
             // Write data to file
             Files.write(path, data.getBytes(), StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
+            return Files.size(path); // Return the size of the file
+        } catch (IOException e) {
+            logger.log(Level.SEVERE, "Failed to write file: " + filePath, e);
+            return 0; // In case of error, return 0
+        }
+    }
+
+    private long downloadFile(byte[] data, String filePath) {
+        try {
+            // Ensure directory path exists before writing the file
+            String safeFilePath = generateSafeFilePath(filePath);
+            Path path = Paths.get(safeFilePath);
+            Files.createDirectories(path.getParent());
+
+            // Write data to file
+            Files.write(path, data, StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
             return Files.size(path); // Return the size of the file
         } catch (IOException e) {
             logger.log(Level.SEVERE, "Failed to write file: " + filePath, e);
@@ -78,6 +133,38 @@ public class GopherIndexer {
             }
         }
     }
+
+    public byte[] fetchBinaryFromGopher(String hostname, int port, String selector) {
+        try {
+            connectionHandler.connect(hostname, port);
+            connectionHandler.getOutputStream().print(selector + "\r\n");
+            connectionHandler.getOutputStream().flush();
+
+            // Prepare to read the binary data from the stream
+            ByteArrayOutputStream buffer = new ByteArrayOutputStream();
+            byte[] data = new byte[1024];
+            int nRead;
+            while ((nRead = connectionHandler.getRawInputStream().read(data, 0, data.length)) != -1) {
+                buffer.write(data, 0, nRead);
+            }
+            buffer.flush();
+            return buffer.toByteArray();
+        } catch(SocketTimeoutException e){
+            logger.log(Level.WARNING, "Timeout occurred while connecting to or reading from " + hostname + ":" + port, e);
+            this.numBadFiles++;
+            return null;
+        } catch (IOException e) {
+            logger.log(Level.SEVERE, "Failed to connect to " + hostname + ":" + port, e);
+            return null;
+        } finally {
+            try {
+                connectionHandler.disconnect();
+            } catch (IOException e) {
+                logger.log(Level.SEVERE, "Failed to disconnect from " + hostname + ":" + port, e);
+            }
+        }
+    }
+
 
     public boolean isServerUp(String hostname, int port) {
         try {
@@ -146,27 +233,47 @@ public class GopherIndexer {
                 }
                 case "0" -> {
                     textFiles.add(fullPath);
-                    long size = data.length();
-                    if (size < smallestTextFileSize) {
-                        smallestTextFileSize = size;
-                        smallestTextFileContents = data;
-                    }
-                    if (size > largestTextFileSize) {
-                        largestTextFileSize = size;
+                    String downloadData = fetchFromGopher(newHostname, newPort, newSelector);
+                    if (downloadData == null || downloadData.isEmpty()) {
+                        logger.log(Level.WARNING, "Empty or null response received for selector: " + selector);
                     }
 
-                    String savePath = "downloaded_files/" + fullPath.replaceAll("[^a-zA-Z0-9.-]", "_");
-                    long fileSize = downloadFile(newHostname, newPort, newSelector, savePath);
-                    logger.log(Level.INFO, "File downloaded and saved: " + savePath + " (Size: " + fileSize + " bytes)");
+                    if( downloadData != null){
+                        // Remove the trailing period if it exists
+                        if (downloadData.endsWith(".\n")) {
+                            downloadData = downloadData.substring(0, downloadData.length() - 2);
+                        } else if (downloadData.endsWith(".")) {
+                            downloadData = downloadData.substring(0, downloadData.length() - 1);
+                        }
+                        long size = downloadFile(downloadData, fullPath);
+                        if (size > 0){
+                            if (size < smallestTextFileSize) {
+                                smallestTextFileSize = size;
+                                smallestTextFileContents = downloadData;
+                            }
+                            if (size > largestTextFileSize) {
+                                largestTextFileSize = size;
+                            }
+                            logger.log(Level.INFO, "File downloaded and saved: " + fullPath + " (Size: " + size + " bytes)");
+                        }
+                    }
                 }
                 case "9" -> { // binary files
                     binaryFiles.add(fullPath);
-                    long size = data.length();
-                    if (size < smallestBinaryFileSize) {
-                        smallestBinaryFileSize = size;
-                    }
-                    if (size > largestBinaryFileSize) {
-                        largestBinaryFileSize = size;
+                    byte[] downloadData = fetchBinaryFromGopher(newHostname, newPort, newSelector);
+                    if (downloadData == null ) {
+                        logger.log(Level.WARNING, "Empty or null response received for selector: " + selector);
+                    } else {
+                        long size = downloadFile(downloadData, fullPath);
+                        if (size > 0){
+                            if (size < smallestBinaryFileSize) {
+                                smallestBinaryFileSize = size;
+                            }
+                            if (size > largestBinaryFileSize) {
+                                largestBinaryFileSize = size;
+                            }
+                            logger.log(Level.INFO, "File downloaded and saved: " + fullPath + " (Size: " + size + " bytes)");
+                        }
                     }
                 }
             }
