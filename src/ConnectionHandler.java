@@ -1,6 +1,11 @@
 import java.io.*;
 import java.net.*;
 
+/**
+ * The ConnectionHandler class is responsible for establishing and managing a network connection
+ * to a specified host and port. It handles both textual and binary data transmission,
+ * and provides functionality to manage timeouts and retry connections if initial attempts fail.
+ */
 public class ConnectionHandler {
     private Socket socket;
     private PrintWriter out;
@@ -12,6 +17,13 @@ public class ConnectionHandler {
     private static final int READ_TIMEOUT = 5000; // 5 seconds
     private static final int MAX_RETRIES = 2; // max retries for connecting
 
+    /**
+     * Attempts to connect to a server with a specified host and port,
+     * retrying up to a maximum number of times defined by MAX_RETRIES.
+     * @param host The hostname or IP address of the server to connect to.
+     * @param port The port number of the server.
+     * @throws IOException If all attempts to connect fail or if interrupted during the retry backoff.
+     */
     public void connect(String host, int port) throws IOException {
         IOException lastException = null;
         for (int attempts = 0; attempts < MAX_RETRIES; attempts++) {
@@ -52,12 +64,23 @@ public class ConnectionHandler {
         throw lastException;
     }
 
+    /**
+     * Closes the connection and associated streams.
+     * @throws IOException If an error occurs while closing the socket or streams.
+     */
     public void disconnect() throws IOException {
         in.close();
         out.close();
         socket.close();
     }
 
+    /**
+     * Sends a specified request to the connected server and retrieves the response.
+     * The response is limited to a maximum size to prevent excessive memory usage.
+     * @param request The request string to be sent to the server.
+     * @return A string containing the server's response.
+     * @throws IOException If an error occurs during communication or if the response exceeds the maximum allowable size.
+     */
     public String sendRequest(String request) throws IOException {
         out.print(request + "\r\n");
         out.flush();  // Ensure that all data is sent to the server
@@ -78,10 +101,18 @@ public class ConnectionHandler {
         return response.toString();
     }
 
+    /**
+     * Provides access to the raw input stream for reading binary data directly from the socket.
+     * @return The InputStream connected to the socket for binary data.
+     */
     public InputStream getRawInputStream() {
         return rawIn;  // Return the InputStream for binary data
     }
 
+    /**
+     * Provides access to the output stream for sending data to the connected server.
+     * @return The PrintWriter connected to the socket's output stream.
+     */
     public PrintWriter getOutputStream() {
         return out;
     }

@@ -10,6 +10,13 @@ import java.nio.file.StandardOpenOption;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 
+/**
+ * The GopherIndexer class is designed to recursively fetch and index files from Gopher servers.
+ * It keeps track of visited directories, downloads text and binary files, and logs various statistics
+ * such as the smallest and largest files and server connectivity status. The class uses a combination
+ * of lists to manage files and server states, and employs a custom connection handler to manage network operations.
+ */
+
 public class GopherIndexer {
     private final String hostname;
     private final int port;
@@ -32,6 +39,13 @@ public class GopherIndexer {
 
     private final ConnectionHandler connectionHandler = new ConnectionHandler();
 
+    /**
+     * Constructor initializes the GopherIndexer with a specified hostname and port.
+     * It sets up lists and sets to track various states and files during operation.
+     * @param hostname The hostname of the Gopher server to connect to.
+     * @param port The port of the Gopher server.
+     */
+
     public GopherIndexer(String hostname,int port) {
         this.hostname = hostname;
         this.port = port;
@@ -45,6 +59,11 @@ public class GopherIndexer {
         this.uniqueInvalidReferences = new ArrayList<>();
     }
 
+    /**
+     * Converts an array of bytes into a hexadecimal String.
+     * @param bytes The byte array to convert.
+     * @return A String representing the hexadecimal value of the byte array.
+     */
     private static String bytesToHex(byte[] bytes) {
         StringBuilder sb = new StringBuilder();
         for (byte b : bytes) {
@@ -53,6 +72,12 @@ public class GopherIndexer {
         return sb.toString();
     }
 
+    /**
+     * Generates a filesystem-safe path from a given full path, ensuring it adheres to length restrictions and avoids character collisions.
+     * @param fullPath The full path to be sanitized and truncated.
+     * @return A String representing the safe file path.
+     * @throws RuntimeException If no suitable hashing algorithm is found.
+     */
     private String generateSafeFilePath(String fullPath) {
         try {
             // Sanitize the string to remove unwanted characters
@@ -82,6 +107,12 @@ public class GopherIndexer {
         }
     }
 
+    /**
+     * Downloads data to a file at the specified file path, ensuring directories exist and handling file creation.
+     * @param data The string data to be written to the file.
+     * @param filePath The path where the file will be written.
+     * @return The size of the file written or 0 if an error occurs.
+     */
     private long downloadFile(String data, String filePath) {
         try {
             // Ensure directory path exists before writing the file
@@ -98,6 +129,12 @@ public class GopherIndexer {
         }
     }
 
+/**
+     * Downloads binary data to a file at the specified file path, ensuring directories exist and handling file creation.
+     * @param data The byte array data to be written to the file.
+     * @param filePath The path where the file will be written.
+     * @return The size of the file written or 0 if an error occurs.
+     */
     private long downloadFile(byte[] data, String filePath) {
         try {
             // Ensure directory path exists before writing the file
@@ -114,7 +151,13 @@ public class GopherIndexer {
         }
     }
 
-
+    /**
+     * Fetches data from a Gopher server at the specified hostname and port using the provided selector.
+     * @param hostname The hostname of the Gopher server.
+     * @param port The port of the Gopher server.
+     * @param selector The selector to fetch data from the server.
+     * @return The data fetched from the server or null if an error occurs.
+     */
     public String fetchFromGopher(String hostname, int port, String selector) {
         try {
             connectionHandler.connect(hostname, port);
@@ -134,6 +177,13 @@ public class GopherIndexer {
         }
     }
 
+    /**
+     * Fetches binary data from a Gopher server at the specified hostname and port using the provided selector.
+     * @param hostname The hostname of the Gopher server.
+     * @param port The port of the Gopher server.
+     * @param selector The selector to fetch binary data from the server.
+     * @return The binary data fetched from the server or null if an error occurs.
+     */
     public byte[] fetchBinaryFromGopher(String hostname, int port, String selector) {
         try {
             connectionHandler.connect(hostname, port);
@@ -165,6 +215,12 @@ public class GopherIndexer {
     }
 
 
+    /**
+     * Checks if a server is up by attempting to connect to it.
+     * @param hostname The hostname of the server to check.
+     * @param port The port of the server to check.
+     * @return True if the server is up, false otherwise.
+     */
     public boolean isServerUp(String hostname, int port) {
         try {
             connectionHandler.connect(hostname, port);
@@ -180,6 +236,15 @@ public class GopherIndexer {
         }
     }
 
+    /**
+     * Recursively fetches data from a Gopher server at the specified hostname and port using the provided selector.
+     * It processes the data to download text and binary files, and logs various statistics.
+     * @param hostname The hostname of the Gopher server.
+     * @param port The port of the Gopher server.
+     * @param selector The selector to fetch data from the server.
+     * @param path The path of the current resource being fetched.
+     * @throws IOException If an error occurs during the fetch operation.
+     */
     public void recursiveFetch(String hostname, int port, String selector, String path) throws IOException {
         String resourceKey = hostname + ":" + port + selector;
         if (visited.contains(resourceKey)) {
@@ -283,6 +348,12 @@ public class GopherIndexer {
         }
     }
 
+    /**
+     * Prints statistics about the indexing operation, including the number of directories visited,
+     * the number of text and binary files fetched successfully, the number of bad text and binary files,
+     * the smallest and largest text and binary file sizes, the smallest text file content, the list of external servers
+     * that are up and down, the total number of unique invalid references, and the list of unique invalid references.
+     */
     public void printStatistics() {
         System.out.println("Total directories visited: " + visited.size());
         System.out.println();
@@ -342,6 +413,10 @@ public class GopherIndexer {
         }
     }
 
+    /**
+     * Main method to run the GopherIndexer and fetch data from a Gopher server.
+     * @param args The command line arguments.
+     */
     public static void main(String[] args) {
         String hostname = "comp3310.ddns.net";
         int port = 70;
