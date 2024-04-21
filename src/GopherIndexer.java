@@ -12,6 +12,7 @@ import java.security.NoSuchAlgorithmException;
 
 public class GopherIndexer {
     private final String hostname;
+    private final int port;
     private final Set<String> visited;
     private final List<String> textFiles;
     private final List<String> binaryFiles;
@@ -20,19 +21,20 @@ public class GopherIndexer {
     private long smallestTextFileSize = Long.MAX_VALUE;
     private long smallestBinaryFileSize = Long.MAX_VALUE;
     private long largestBinaryFileSize = 0;
-    private long numbExternaliseUp = 0;
-    private long numServerDown = 0;
-    private long numBadFolders = 0;
+    private long numbExternalServerUp = 0;
+    private long numbExternalServerDown = 0;
     private long numBadTextFiles = 0;
     private long numBadBinaryFilers = 0;
+    private long numUniqueInvalidReferences = 0;
 
     private static final int MAX_FILENAME_LENGTH = 63;
     private static final String DOWNLOAD_DIRECTORY = "downloaded_files/";
 
     private final ConnectionHandler connectionHandler = new ConnectionHandler();
 
-    public GopherIndexer(String hostname) {
+    public GopherIndexer(String hostname,int port) {
         this.hostname = hostname;
+        this.port = port;
         this.visited = new HashSet<>();
         this.textFiles = new ArrayList<>();
         this.binaryFiles = new ArrayList<>();
@@ -117,7 +119,7 @@ public class GopherIndexer {
             return null;
         }catch (IOException e) {
             Logger.severe("Failed to connect to " + hostname + ":" + port + " [" + e.getMessage() + "]");
-            numServerDown++;
+            numbExternalServerDown++;
             return null;
         } finally {
             try {
@@ -148,7 +150,7 @@ public class GopherIndexer {
             return null;
         } catch (IOException e) {
             Logger.severe("Failed to connect to " + hostname + ":" + port + " [" + e.getMessage() + "]");
-            numServerDown++;
+            numbExternalServerDown++;
             return null;
         } finally {
             try {
@@ -187,7 +189,6 @@ public class GopherIndexer {
         String data = fetchFromGopher(hostname, port, selector);
         if (data == null || data.isEmpty()) {
             Logger.warning("Empty or null response received for selector: " + selector);
-            numBadFolders++;
             return; // Skip processing this resource
         }
 
@@ -217,13 +218,13 @@ public class GopherIndexer {
                     // do nothing
                 }
                 case "1" -> { // folder
-                    if (newHostname.equals(this.hostname)) {
+                    if (newHostname.equals(this.hostname) && newPort == this.port) {
                         recursiveFetch(newHostname, newPort, newSelector, fullPath);
                     } else {
                         if (isServerUp(newHostname, newPort)) {
-                            numbExternaliseUp++;
+                            numbExternalServerUp++;
                         } else {
-                            numServerDown++;
+                            numbExternalServerDown++;
                         }
                     }
                 }
@@ -253,6 +254,9 @@ public class GopherIndexer {
                         }
                         Logger.info("File downloaded and saved: " + fullPath + " (Size: " + size + " bytes)");
                     }
+                }
+                case "3" -> { // unique invalid references
+                    numUniqueInvalidReferences++;
                 }
                 case "9" -> { // binary file
                     binaryFiles.add(fullPath);
@@ -292,8 +296,8 @@ public class GopherIndexer {
         System.out.println("Smallest binary file size: " + smallestBinaryFileSize);
         System.out.println("Largest binary file size: " + largestBinaryFileSize);
         System.out.println("---------------------------------------------------");
-        System.out.println("Number of reachable external servers (up): " + numbExternaliseUp);
-        System.out.println("Number of unreachable servers (down): " + numServerDown);
+        System.out.println("Number of reachable external servers (up): " + numbExternalServerUp);
+        System.out.println("Number of unreachable servers (down): " + numbExternalServerDown);
         System.out.println("Number of bad text file(s): " + numBadTextFiles);
         System.out.println("Number of bad binary file(s): " + numBadBinaryFilers);
     }
@@ -302,7 +306,7 @@ public class GopherIndexer {
         String hostname = "comp3310.ddns.net";
         int port = 70;
 
-        GopherIndexer indexer = new GopherIndexer(hostname);
+        GopherIndexer indexer = new GopherIndexer(hostname, port);
 
         try {
             indexer.recursiveFetch(hostname, port, "", "");
