@@ -10,7 +10,7 @@ public class ConnectionHandler {
     // Constants for timeout and retries
     private static final int CONNECTION_TIMEOUT = 2000; // 2 seconds
     private static final int READ_TIMEOUT = 5000; // 5 seconds
-    private static final int MAX_RETRIES = 3; // max retries for connecting
+    private static final int MAX_RETRIES = 2; // max retries for connecting
 
     public void connect(String host, int port) throws IOException {
         IOException lastException = null;

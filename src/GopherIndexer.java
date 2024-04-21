@@ -16,16 +16,16 @@ public class GopherIndexer {
     private final Set<String> visited;
     private final List<String> textFiles;
     private final List<String> binaryFiles;
+    private final List<String> badTextFiles;
+    private final List<String> badBinaryFiles;
     private long largestTextFileSize = 0;
     private String smallestTextFileContents = null;
     private long smallestTextFileSize = Long.MAX_VALUE;
     private long smallestBinaryFileSize = Long.MAX_VALUE;
     private long largestBinaryFileSize = 0;
-    private long numbExternalServerUp = 0;
-    private long numbExternalServerDown = 0;
-    private long numBadTextFiles = 0;
-    private long numBadBinaryFilers = 0;
-    private long numUniqueInvalidReferences = 0;
+    private final List<String> externalServersUp;
+    private final List<String> externalServersDown;
+    private final List<String> uniqueInvalidReferences;
 
     private static final int MAX_FILENAME_LENGTH = 63;
     private static final String DOWNLOAD_DIRECTORY = "downloaded_files/";
@@ -38,6 +38,11 @@ public class GopherIndexer {
         this.visited = new HashSet<>();
         this.textFiles = new ArrayList<>();
         this.binaryFiles = new ArrayList<>();
+        this.badBinaryFiles = new ArrayList<>();
+        this.badTextFiles = new ArrayList<>();
+        this.externalServersUp = new ArrayList<>();
+        this.externalServersDown = new ArrayList<>();
+        this.uniqueInvalidReferences = new ArrayList<>();
     }
 
     private static String bytesToHex(byte[] bytes) {
@@ -119,7 +124,6 @@ public class GopherIndexer {
             return null;
         }catch (IOException e) {
             Logger.severe("Failed to connect to " + hostname + ":" + port + " [" + e.getMessage() + "]");
-            numbExternalServerDown++;
             return null;
         } finally {
             try {
@@ -150,7 +154,6 @@ public class GopherIndexer {
             return null;
         } catch (IOException e) {
             Logger.severe("Failed to connect to " + hostname + ":" + port + " [" + e.getMessage() + "]");
-            numbExternalServerDown++;
             return null;
         } finally {
             try {
@@ -222,19 +225,18 @@ public class GopherIndexer {
                         recursiveFetch(newHostname, newPort, newSelector, fullPath);
                     } else {
                         if (isServerUp(newHostname, newPort)) {
-                            numbExternalServerUp++;
+                            externalServersUp.add(newHostname + ":" + newPort);
                         } else {
-                            numbExternalServerDown++;
+                            externalServersDown.add(newHostname + ":" + newPort);
                         }
                     }
                 }
                 case "0" -> { // .txt file
-                    textFiles.add(fullPath);
                     System.out.println("Fetching: " + new Date() + " - " + newHostname + ":" + newPort + newSelector);
                     String downloadData = fetchFromGopher(newHostname, newPort, newSelector);
                     if (downloadData == null || downloadData.isEmpty()) {
                         Logger.warning("Empty or null response received for selector: " + selector);
-                        numBadTextFiles++;
+                        this.badTextFiles.add(fullPath);
                     }
 
                     if( downloadData != null){
@@ -252,19 +254,19 @@ public class GopherIndexer {
                         if (size > largestTextFileSize) {
                             largestTextFileSize = size;
                         }
+                        this.textFiles.add(fullPath);
                         Logger.info("File downloaded and saved: " + fullPath + " (Size: " + size + " bytes)");
                     }
                 }
                 case "3" -> { // unique invalid references
-                    numUniqueInvalidReferences++;
+                    this.uniqueInvalidReferences.add(fullPath);
                 }
                 case "9" -> { // binary file
-                    binaryFiles.add(fullPath);
                     System.out.println("Fetching: " + new Date() + " - " + newHostname + ":" + newPort + newSelector);
                     byte[] downloadData = fetchBinaryFromGopher(newHostname, newPort, newSelector);
                     if (downloadData == null ) {
                         Logger.warning("Empty or null response received for selector: " + selector);
-                        numBadBinaryFilers++;
+                        this.badBinaryFiles.add(fullPath);
                     } else {
                         long size = downloadFile(downloadData, fullPath);
                         if (size < smallestBinaryFileSize) {
@@ -273,6 +275,7 @@ public class GopherIndexer {
                         if (size > largestBinaryFileSize) {
                             largestBinaryFileSize = size;
                         }
+                        this.binaryFiles.add(fullPath);
                         Logger.info("File downloaded successfully: " + fullPath + " (Size: " + size + " bytes)");
                     }
                 }
@@ -282,24 +285,61 @@ public class GopherIndexer {
 
     public void printStatistics() {
         System.out.println("Total directories visited: " + visited.size());
-        System.out.println("Total text files: " + textFiles.size());
+        System.out.println();
         System.out.println("---------------------------------------------------");
-        System.out.println("List of all text files:");
-        textFiles.forEach(System.out::println);
+        System.out.println("Total text files (fetched successfully): " + textFiles.size());
+        System.out.println();
+        if (!textFiles.isEmpty()) {
+            System.out.println("List of all text files:");
+            textFiles.forEach(System.out::println);
+        }
         System.out.println("---------------------------------------------------");
-        System.out.println("Total binary files: " + binaryFiles.size());
-        System.out.println("List of all binary files:");
-        binaryFiles.forEach(System.out::println);
+        System.out.println("Total bad text files (empty or null response): " + badTextFiles.size());
+        System.out.println();
+        if (!badTextFiles.isEmpty()) {
+            System.out.println("List of all bad text files:");
+            badTextFiles.forEach(System.out::println);
+        }
         System.out.println("---------------------------------------------------");
+        System.out.println("Total bad binary files (empty or null response): " + badBinaryFiles.size());
+        System.out.println();
+        if (!badBinaryFiles.isEmpty()) {
+            System.out.println("List of all bad binary files:");
+            badBinaryFiles.forEach(System.out::println);
+        }
+        System.out.println("---------------------------------------------------");
+        System.out.println("Total binary files (fetched successfully): " + binaryFiles.size());
+        System.out.println();
+        if (!binaryFiles.isEmpty()) {
+            System.out.println("List of all binary files:");
+            binaryFiles.forEach(System.out::println);
+        }
+        System.out.println("---------------------------------------------------");
+        System.out.println();
         System.out.println("Smallest text file content: " + smallestTextFileContents);
-        System.out.println("Largest text file size: " + largestTextFileSize);
-        System.out.println("Smallest binary file size: " + smallestBinaryFileSize);
-        System.out.println("Largest binary file size: " + largestBinaryFileSize);
+        System.out.println("Largest text file size: " + largestTextFileSize + " bytes");
+        System.out.println("Smallest binary file size: " + smallestBinaryFileSize + " bytes");
+        System.out.println("Largest binary file size: " + largestBinaryFileSize + " bytes");
+        System.out.println();
         System.out.println("---------------------------------------------------");
-        System.out.println("Number of reachable external servers (up): " + numbExternalServerUp);
-        System.out.println("Number of unreachable servers (down): " + numbExternalServerDown);
-        System.out.println("Number of bad text file(s): " + numBadTextFiles);
-        System.out.println("Number of bad binary file(s): " + numBadBinaryFilers);
+        System.out.println("Total external servers: " + (externalServersUp.size() + externalServersDown.size()));
+        System.out.println();
+        if(!externalServersUp.isEmpty()){
+            System.out.println("List of all external servers that are up:");
+            externalServersUp.forEach(System.out::println);
+        }
+        System.out.println();
+        if(!externalServersDown.isEmpty()){
+            System.out.println("List of all external servers that are down:");
+            externalServersDown.forEach(System.out::println);
+        }
+        System.out.println("---------------------------------------------------");
+        System.out.println("Total unique invalid references: " + uniqueInvalidReferences.size());
+        System.out.println();
+        if (!uniqueInvalidReferences.isEmpty()) {
+            System.out.println("List of all unique invalid references:");
+            uniqueInvalidReferences.forEach(System.out::println);
+        }
     }
 
     public static void main(String[] args) {
@@ -310,8 +350,12 @@ public class GopherIndexer {
 
         try {
             indexer.recursiveFetch(hostname, port, "", "");
+            System.out.println(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>");
+            System.out.println();
             System.out.println("\u001B[32m Finish Indexing! \u001B[0m");
             indexer.printStatistics();
+            System.out.println();
+            System.out.println("<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<");
         } catch (IOException e) {
             Logger.severe("Exception occurred" + " [" + e.getMessage() + "]");
         }
