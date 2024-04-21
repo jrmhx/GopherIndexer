@@ -1,0 +1,44 @@
+plugins {
+    id 'java'
+}
+
+// Define the source and target compatibility of the Java compiler
+sourceCompatibility = '19'
+targetCompatibility = '19'
+
+// Define the project source directories
+sourceSets {
+    main {
+        java {
+            srcDirs = ['src']
+        }
+    }
+}
+
+// Define the repository where to fetch dependencies
+repositories {
+    mavenCentral()  // Use Maven Central for any needed libraries
+}
+
+// Define any project dependencies here
+dependencies {
+    // Example: Uncomment to include JUnit test framework
+    // testImplementation 'org.junit.jupiter:junit-jupiter:5.8.2' // JUnit 5 compatible with Java 19
+}
+
+// Define a task to run the GopherIndexer main class
+task run(type: JavaExec) {
+    main = 'GopherIndexer'
+    classpath = sourceSets.main.runtimeClasspath
+    standardInput = System.in
+    if (project.hasProperty('appArgs')) {
+        args Eval.me(appArgs)
+    }
+}
+
+// Allows passing command-line arguments to the application
+run {
+    if (project.hasProperty('appArgs')) {
+        args Eval.me(appArgs)
+    }
+}

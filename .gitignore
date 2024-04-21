@@ -31,3 +31,17 @@ bin/
 
 downloaded_files/
 GopherIndexer.log*
+
+# Ignore Gradle cache
+.gradle/
+build/
+!**/src/main/**/build/
+!**/src/test/**/build/
+
+# Ignore Maven build directory
+target/
+!**/src/main/**/target/
+!**/src/test/**/target/
+
+
+.idea/
