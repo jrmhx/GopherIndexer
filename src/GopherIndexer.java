@@ -33,6 +33,7 @@ public class GopherIndexer {
     private final List<String> externalServersUp;
     private final List<String> externalServersDown;
     private final List<String> uniqueInvalidReferences;
+    private final Map<String, Integer> errorCount;
 
     private static final int MAX_FILENAME_LENGTH = 63;
     private static final String DOWNLOAD_DIRECTORY = "downloaded_files/";
@@ -57,6 +58,20 @@ public class GopherIndexer {
         this.externalServersUp = new ArrayList<>();
         this.externalServersDown = new ArrayList<>();
         this.uniqueInvalidReferences = new ArrayList<>();
+        this.errorCount = new HashMap<>();
+    }
+
+
+    /**
+     * Logs the error message and the number of times it occurred.
+     * @param errorMsg The error message to log.
+     */
+    public void logErrorCount(String errorMsg){
+        if (errorCount.containsKey(errorMsg)) {
+            errorCount.put(errorMsg, errorCount.get(errorMsg) + 1);
+        } else {
+            errorCount.put(errorMsg, 1);
+        }
     }
 
     /**
@@ -125,6 +140,8 @@ public class GopherIndexer {
             return Files.size(path); // Return the size of the file
         } catch (IOException e) {
             Logger.severe("Failed to write file: " + filePath);
+            // add to error count
+            logErrorCount(e.getMessage());
             return 0; // In case of error, return 0
         }
     }
@@ -147,6 +164,7 @@ public class GopherIndexer {
             return Files.size(path); // Return the size of the file
         } catch (IOException e) {
             Logger.severe("Failed to write file: " + filePath);
+            logErrorCount(e.getMessage());
             return 0; // In case of error, return 0
         }
     }
@@ -164,15 +182,18 @@ public class GopherIndexer {
             return connectionHandler.sendRequest(selector);
         } catch(SocketTimeoutException e){
             Logger.severe("Timeout occurred while connecting to or reading from " + hostname + ":" + port + " [" + e.getMessage() + "]");
+            logErrorCount(e.getMessage());
             return null;
         }catch (IOException e) {
             Logger.severe("Failed to connect to " + hostname + ":" + port + " [" + e.getMessage() + "]");
+            logErrorCount(e.getMessage());
             return null;
         } finally {
             try {
                 connectionHandler.disconnect();
             } catch (IOException e) {
                 Logger.severe("Failed to disconnect from " + hostname + ":" + port + " [" + e.getMessage() + "]");
+                logErrorCount(e.getMessage());
             }
         }
     }
@@ -201,15 +222,18 @@ public class GopherIndexer {
             return buffer.toByteArray();
         } catch(SocketTimeoutException e){
             Logger.severe("Timeout occurred while connecting to or reading from " + hostname + ":" + port + " [" + e.getMessage() + "]");
+            logErrorCount(e.getMessage());
             return null;
         } catch (IOException e) {
             Logger.severe("Failed to connect to " + hostname + ":" + port + " [" + e.getMessage() + "]");
+            logErrorCount(e.getMessage());
             return null;
         } finally {
             try {
                 connectionHandler.disconnect();
             } catch (IOException e) {
                 Logger.severe("Failed to disconnect from " + hostname + ":" + port + " [" + e.getMessage() + "]");
+                logErrorCount(e.getMessage());
             }
         }
     }
@@ -232,6 +256,7 @@ public class GopherIndexer {
                 connectionHandler.disconnect();
             } catch (IOException e) {
                 Logger.severe("Failed to disconnect from " + hostname + ":" + port + " [" + e.getMessage() + "]");
+                logErrorCount(e.getMessage());
             }
         }
     }
@@ -257,6 +282,7 @@ public class GopherIndexer {
         String data = fetchFromGopher(hostname, port, selector);
         if (data == null || data.isEmpty()) {
             Logger.warning("Empty or null response received for selector: " + selector);
+            logErrorCount("Empty or null response received for selector");
             return; // Skip processing this resource
         }
 
@@ -266,6 +292,7 @@ public class GopherIndexer {
             String[] parts = line.split("\t");
             if (parts.length < 4) {  // Ensure there are enough parts to process without error
                 Logger.warning("Incorrectly formatted data line: " + line);
+                logErrorCount("Incorrectly formatted data line");
                 continue;
             }
             String type = parts[0].substring(0, 1);
@@ -276,6 +303,7 @@ public class GopherIndexer {
                 newPort = Integer.parseInt(parts[3]);
             } catch (NumberFormatException e) {
                 Logger.severe("Failed to parse port number: " + parts[3]);
+                logErrorCount(e.getMessage());
                 continue; // Skip this entry
             }
 
@@ -302,6 +330,7 @@ public class GopherIndexer {
                     String downloadData = fetchFromGopher(newHostname, newPort, newSelector);
                     if (downloadData == null || downloadData.isEmpty()) {
                         Logger.warning("Empty or null response received for selector: " + selector);
+                        logErrorCount("Empty or null response received for selector");
                         this.badTextFiles.add(fullPath);
                     }
 
@@ -332,6 +361,7 @@ public class GopherIndexer {
                     byte[] downloadData = fetchBinaryFromGopher(newHostname, newPort, newSelector);
                     if (downloadData == null ) {
                         Logger.warning("Empty or null response received for selector: " + selector);
+                        logErrorCount("Empty or null response received for selector");
                         this.badBinaryFiles.add(fullPath);
                     } else {
                         long size = downloadFile(downloadData, fullPath);
@@ -419,6 +449,11 @@ public class GopherIndexer {
         if (!uniqueInvalidReferences.isEmpty()) {
             System.out.println("List of all unique invalid references:");
             uniqueInvalidReferences.forEach(System.out::println);
+        }
+        System.out.println("---------------------------------------------------");
+        if (!errorCount.isEmpty()) {
+            System.out.println("List of error handle/unsuccessful fetching while run the indexer:");
+            errorCount.forEach((key, value) -> System.out.println(key + " : " + value));
         }
     }
 

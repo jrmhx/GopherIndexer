@@ -140,4 +140,16 @@ gradle run -PappArgs="['gopher.floodgap.com', '70']"
     - Counts and lists external servers that are up and those that are down. 
   - Unique Invalid References: 
     - Displays the number of unique invalid references encountered (type 3) and lists them.
+  - Error Statistics: 
+    - Displays the number of errors encountered during the indexing process.
 
+
+## Documentation
+
+The source code is documented using Javadoc comments. You can generate the Javadoc documentation by running the following command:
+
+```bash
+gradle javadoc
+```
+
+The generated documentation can be found in the `build/docs/javadoc` directory. You can open the `index.html` file in a web browser to view the documentation.
