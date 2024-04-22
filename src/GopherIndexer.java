@@ -282,17 +282,18 @@ public class GopherIndexer {
             String fullPath = path + newSelector; // Sanitize newSelector to be safe as a file path component
 
             switch (type) {
-                case "i" -> {
-                    // do nothing
-                }
-                case "1" -> { // folder
+                case "1" -> { // directories
                     if (newHostname.equals(this.hostname) && newPort == this.port) {
                         recursiveFetch(newHostname, newPort, newSelector, fullPath);
                     } else {
-                        if (isServerUp(newHostname, newPort)) {
-                            externalServersUp.add(newHostname + ":" + newPort);
-                        } else {
-                            externalServersDown.add(newHostname + ":" + newPort);
+                        String resourceKeyExternal = newHostname + ":" + newPort + newSelector;
+                        if (! visited.contains(resourceKeyExternal)) {
+                            visited.add(resourceKeyExternal); // Mark external server as visited to prevent re-fetching
+                            if (isServerUp(newHostname, newPort)) {
+                                externalServersUp.add(newHostname + ":" + newPort);
+                            } else {
+                                externalServersDown.add(newHostname + ":" + newPort);
+                            }
                         }
                     }
                 }
@@ -355,7 +356,15 @@ public class GopherIndexer {
      * that are up and down, the total number of unique invalid references, and the list of unique invalid references.
      */
     public void printStatistics() {
-        System.out.println("Total directories visited: " + visited.size());
+        System.out.println("Total directories on the server: " + visited.size());
+        System.out.println("\u001B[33mNOTE\u001B[0m: This includes data fetched from the server that has a data type of '1' (directories)");
+        System.out.println("\u001B[33mNOTE\u001B[0m: It doesn't include dictionaries that can be fetched from the external server");
+        System.out.println("\u001B[33mNOTE\u001B[0m: The directories included are not guranteed to be reachable (maybe due to the server being down)");
+        System.out.println("\u001B[33mNOTE\u001B[0m: It includes the server's root directory as well");
+        if (!visited.isEmpty()) {
+            System.out.println("List of all directories on the server:");
+            visited.forEach(System.out::println);
+        }
         System.out.println();
         System.out.println("---------------------------------------------------");
         System.out.println("Total text files (fetched successfully): " + textFiles.size());
@@ -418,8 +427,20 @@ public class GopherIndexer {
      * @param args The command line arguments.
      */
     public static void main(String[] args) {
-        String hostname = "comp3310.ddns.net";
-        int port = 70;
+        String hostname = "comp3310.ddns.net"; // Default hostname
+        int port = 70; // Default port
+
+        if (args.length == 2) {
+            hostname = args[0];
+            try {
+                port = Integer.parseInt(args[1]);
+            } catch (NumberFormatException e) {
+                Logger.severe("Invalid port number: " + args[1]);
+                System.exit(1);
+            }
+        }
+
+        System.out.printf("\u001B[32mIndexing Gopher server: %s:%d%n\u001B[0m", hostname, port);
 
         GopherIndexer indexer = new GopherIndexer(hostname, port);
 
@@ -428,6 +449,7 @@ public class GopherIndexer {
             System.out.println(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>");
             System.out.println();
             System.out.println("\u001B[32m Finish Indexing! \u001B[0m");
+            System.out.println();
             indexer.printStatistics();
             System.out.println();
             System.out.println("<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<");
