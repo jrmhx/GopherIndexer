@@ -11,7 +11,6 @@ public class Logger {
      * This method should be used to indicate successful operations or important state changes in the application.
      * @param msg The message to be logged.
      */
-
     public static void info(String msg){
         System.out.println("\u001B[32m" + "INFO:" + " " + new Date() + " " + msg + "\u001B[0m");
     }

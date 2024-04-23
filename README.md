@@ -4,9 +4,49 @@
 
 The Gopher Indexer is a Java application designed to fetch and index files from Gopher servers. It efficiently manages connections, handles both text and binary data, and logs detailed operational statistics.
 
-##### WireShark Screenshot while running the application:
+## WireShark Screenshot & Summary for the Initial Response:
+
+We can first use `telnet` to inspect the destination of the Gopher server `comp3310.ddns.net:70`:
+
+```bash
+telnet comp3310.ddns.net 70
+```
+
+From the output, we can see server ip is: `170.64.166.99`.
+
+Then we can use `WireShark` to capture the packets during the connection. The screenshot is shown below (red box):
 
 ![WireShark Screenshot](./wireshark.png)
+
+### Packet Breakdown
+#### Packet 2291
+- Timestamp: 127.972203 seconds since capture start. 
+- Source IP: 10.28.102.39 (client)
+- Destination IP: 170.64.166.99 (server)
+- Protocol: TCP 
+- Details: This packet initiates a connection to the server with the TCP SYN flag set, indicating the start of a TCP handshake. The sequence number is 0. The client proposes a window size of 65535 and other TCP options like maximum segment size (MSS) of 1460, window scaling factor (WS) of 64, timestamp value, and selective acknowledgment permitted (SACK_PERM).
+#### Packet 2292
+- Timestamp: 127.981002 seconds.
+- Source IP: 170.64.166.99 (server)
+- Destination IP: 10.28.102.39 (client)
+- Protocol: TCP
+- Details: The server responds with TCP SYN, ACK flags, acknowledging the client's SYN (Ack=1). The sequence number is 0, starting its own sequence count. The server proposes a window size of 31856 and sets its MSS to 1460, with a WS of 128, along with similar TCP options as the client.
+#### Packet 2293
+- Timestamp: 127.981113 seconds.
+- Source IP: 10.28.102.39 (client)
+- Destination IP: 170.64.166.99 (server)
+- Protocol: TCP
+- Details: The client acknowledges the server's SYN, ACK with an ACK packet, completing the TCP three-way handshake. This packet has no data payload, indicating it's merely an acknowledgment with Seq=1 and Ack=1, where Seq=1 is the next expected byte from the client.
+#### Packet 2294
+- Timestamp: 127.982623 seconds.
+- Source IP: 10.28.102.39 (client)
+- Destination IP: 170.64.166.99 (server)
+- Protocol: Gopher
+- Details: The client sends a Gopher request after the handshake is completed. The request is for a directory listing. Gopher is a protocol designed to distribute, search, and retrieve documents over the Internet.
+### Analysis of the Communication
+Establishment of TCP Connection: The packets describe a typical TCP three-way handshake which is essential for establishing a reliable connection between two hosts. This ensures that both the client and the server are ready to send and receive data, providing a reliable connection-oriented service.
+
+Gopher Protocol Use: After the TCP connection is established, the client begins communication using the Gopher protocol, indicated by the Gopher request for a directory listing. Gopher is a less common protocol today, typically used in specific, often academic or legacy contexts. This indicates a specific use case or a possibly older system still in operation.
 
 ## Requirements
 
