@@ -98,29 +98,38 @@ public class GopherIndexer {
             // Sanitize the string to remove unwanted characters
             String safePath = fullPath.replaceAll("[^a-zA-Z0-9.-]", "_");
 
-            // Truncate if necessary to prevent excessively long filenames
-            if (safePath.length() > MAX_FILENAME_LENGTH) {
-                String extension = ""; // Assuming an extension could be in the path, like .txt or .bin
-                int dotIndex = safePath.lastIndexOf('.');
-                if (dotIndex > 0) {
-                    extension = safePath.substring(dotIndex);
-                    safePath = safePath.substring(0, dotIndex);
-                }
-
-                // Hash the original path to append as a unique identifier to prevent collisions
-                MessageDigest digest = MessageDigest.getInstance("SHA-256");
-                byte[] hashBytes = digest.digest(fullPath.getBytes());
-                String hash = bytesToHex(hashBytes).substring(0, 8); // Short hash to keep overall length under control
-
-                // Append hash and ensure total length including extension doesn't exceed max
-                safePath = safePath.substring(0, Math.min(safePath.length(), MAX_FILENAME_LENGTH - hash.length() - extension.length())) + hash + extension;
+            // Attempt to find the extension, if any
+            String extension = "";
+            int dotIndex = safePath.lastIndexOf('.');
+            if (dotIndex > 0) {
+                extension = safePath.substring(dotIndex);  // Capture the extension
+                safePath = safePath.substring(0, dotIndex); // Remove extension from the main path
             }
 
-            return Paths.get(DOWNLOAD_DIRECTORY, safePath).toString();
+            // Hash the sanitized path without the extension to generate a unique suffix
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            byte[] hashBytes = digest.digest(fullPath.getBytes());
+            String hash = bytesToHex(hashBytes).substring(0, Math.min(8, bytesToHex(hashBytes).length()));  // Ensure the substring index is valid
+
+            // Construct the final path with hash and extension
+            safePath += hash + extension;
+            safePath = safePath.length() > MAX_FILENAME_LENGTH ? safePath.substring(0, MAX_FILENAME_LENGTH) : safePath;
+
+            // Create the full file path and check for uniqueness
+            Path path = Paths.get(DOWNLOAD_DIRECTORY, safePath);
+            int counter = 1;
+            while (Files.exists(path)) {
+                safePath = safePath + "_" + counter++;
+                path = Paths.get(DOWNLOAD_DIRECTORY, safePath);
+            }
+
+            return path.toString();
         } catch (NoSuchAlgorithmException e) {
             throw new RuntimeException("Failed to hash path due to missing algorithm.");
         }
     }
+
+
 
     /**
      * Downloads data to a file at the specified file path, ensuring directories exist and handling file creation.
