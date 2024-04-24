@@ -18,6 +18,7 @@ import java.security.NoSuchAlgorithmException;
  */
 
 public class GopherIndexer {
+    private final int MAX_DEPTH;
     private final String hostname;
     private final int port;
     private final Set<String> visited;
@@ -47,7 +48,8 @@ public class GopherIndexer {
      * @param port The port of the Gopher server.
      */
 
-    public GopherIndexer(String hostname,int port) {
+    public GopherIndexer(String hostname,int port, int maxDepth){
+        this.MAX_DEPTH = maxDepth;
         this.hostname = hostname;
         this.port = port;
         this.visited = new HashSet<>();
@@ -279,7 +281,13 @@ public class GopherIndexer {
      * @param path The path of the current resource being fetched.
      * @throws IOException If an error occurs during the fetch operation.
      */
-    public void recursiveFetch(String hostname, int port, String selector, String path) throws IOException {
+    public void recursiveFetch(String hostname, int port, String selector, String path, int currentDepth) throws IOException {
+
+        if (currentDepth >= MAX_DEPTH) {
+            Logger.warning("Maximum depth reached, stopping recursion at depth: " + currentDepth);
+            return; // Stop recursion if the maximum depth is reached
+        }
+
         String resourceKey = hostname + ":" + port + selector;
         if (visited.contains(resourceKey)) {
             return;
@@ -321,7 +329,7 @@ public class GopherIndexer {
             switch (type) {
                 case "1" -> { // directories
                     if (newHostname.equals(this.hostname) && newPort == this.port) {
-                        recursiveFetch(newHostname, newPort, newSelector, fullPath);
+                        recursiveFetch(newHostname, newPort, newSelector, fullPath, currentDepth + 1);
                     } else {
                         String resourceKeyExternal = newHostname + ":" + newPort + newSelector;
                         if (! visited.contains(resourceKeyExternal)) {
@@ -473,8 +481,9 @@ public class GopherIndexer {
     public static void main(String[] args) {
         String hostname = "comp3310.ddns.net"; // Default hostname
         int port = 70; // Default port
+        int maxDepth = 1024; // Default maximum depth
 
-        if (args.length == 2) {
+        if (args.length >= 2) {
             hostname = args[0];
             try {
                 port = Integer.parseInt(args[1]);
@@ -484,12 +493,21 @@ public class GopherIndexer {
             }
         }
 
-        System.out.printf("\u001B[32mIndexing Gopher server: %s:%d%n\u001B[0m", hostname, port);
+        if (args.length >= 3) {
+            try {
+                maxDepth = Integer.parseInt(args[2]);
+            } catch (NumberFormatException e) {
+                Logger.severe("Invalid depth limit: " + args[2]);
+                System.exit(1);
+            }
+        }
 
-        GopherIndexer indexer = new GopherIndexer(hostname, port);
+        System.out.printf("\u001B[32mIndexing Gopher server: %s:%d with a depth limit of %d%n\u001B[0m", hostname, port, maxDepth);
+
+        GopherIndexer indexer = new GopherIndexer(hostname, port, maxDepth);
 
         try {
-            indexer.recursiveFetch(hostname, port, "", "");
+            indexer.recursiveFetch(hostname, port, "", "", 0);
             System.out.println(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>");
             System.out.println();
             System.out.println("\u001B[32m Finish Indexing! \u001B[0m");

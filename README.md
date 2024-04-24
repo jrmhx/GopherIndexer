@@ -42,11 +42,11 @@ Then we can use `WireShark` to capture the packets during the connection. The sc
 - Source IP: 10.28.102.39 (client)
 - Destination IP: 170.64.166.99 (server)
 - Protocol: Gopher
-- Details: The client sends a Gopher request after the handshake is completed. The request is for a directory listing. Gopher is a protocol designed to distribute, search, and retrieve documents over the Internet.
+- Details: The client sends a Gopher request after the handshake is completed. The request is for a directory listing. 
 ### Analysis of the Communication
 Establishment of TCP Connection: The packets describe a typical TCP three-way handshake which is essential for establishing a reliable connection between two hosts. This ensures that both the client and the server are ready to send and receive data, providing a reliable connection-oriented service.
 
-Gopher Protocol Use: After the TCP connection is established, the client begins communication using the Gopher protocol, indicated by the Gopher request for a directory listing. Gopher is a less common protocol today, typically used in specific, often academic or legacy contexts. This indicates a specific use case or a possibly older system still in operation.
+Gopher Protocol Use: After the TCP connection is established, the client begins communication using the Gopher protocol, indicated by the Gopher request for a directory listing. 
 
 ## Requirements
 
@@ -97,7 +97,7 @@ After building the application, you can simply run the application using the fol
 gradle run
 ```
 
-This will connect to the default Gopher server `comp3310.ddns.net:70`, and index the files on it. The application will then print the indexed files and statistics to the console.
+This will connect to the default Gopher server `comp3310.ddns.net:70` with default indexing depth `1024`, and index the files on it. The application will then print the indexed files and statistics to the console.
 
 You can also save the output to a file by running the following command:
 
@@ -117,18 +117,20 @@ cat output.log
 The application is a command-line tool that accepts the following arguments:
 
 ```bash
-gradle run [-PappArgs="['<hostname>', '<port number>']"]
+gradle run [-PappArgs="['<hostname>', '<port number>', '<depth limit>']"]
 ```
 
 - `<hostname>`: the hostname of the Gopher server to connect to
 - `<port number>`: the port number of the Gopher server to connect to
-- If no arguments are provided, the application will connect to the default Gopher server `comp3310.ddns.net` on port `70`.
+- `<depth limit>`: the maximum depth to index directories on the server (default is `1024`)
+- If no arguments are provided, the application will connect to the default Gopher server `comp3310.ddns.net` on port `70` with `1024` max indexing depth.
 
 Example of running the application with arguments:
 
 ```bash
-gradle run -PappArgs="['gopher.floodgap.com', '70']"
+gradle run -PappArgs="['comp3310.ddns.net', '70', '5']"
 ```
+This will connect to the Gopher server `comp3310.ddns.net` on port `70` with a maximum indexing depth of `5`.
 
 
 
@@ -146,6 +148,16 @@ gradle run -PappArgs="['gopher.floodgap.com', '70']"
   - `WARNING`: warning messages, ANSI color code: yellow
   - `SEVERE`: severe error messages, ANSI color code: red
 - The successfully fetched files can be found in the `download_files` directory under the project root directory after running the application. The file name might be changed for a safe file-save operation.
+
+## Edge Cases Handling
+
+- The application handles the edge case where the server response is empty or null.
+- The application handles the edge case where the server response is too large to be read.
+- The application handles the edge case where the server response is not a valid Gopher item.
+- The application handles the edge case where the server response is a type 3 error message.
+- The application handles the edge case where the server has duplicate directories.
+- The application handles the edge case where the server has a circular reference to itself.
+- The application handles the edge case where the server has a very deep directory structure. (you can manually set depth limit).
 
 ## Output
 
@@ -182,7 +194,6 @@ gradle run -PappArgs="['gopher.floodgap.com', '70']"
     - Displays the number of unique invalid references encountered (type 3) and lists them.
   - Error Statistics: 
     - Displays the number of errors encountered during the indexing process.
-
 
 ## Documentation
 
