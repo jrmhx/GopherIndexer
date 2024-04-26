@@ -164,7 +164,7 @@ This will connect to the Gopher server `comp3310.ddns.net` on port `70` with a m
 - The application will output the log while it indexing;
 - The statistics will be printed at the end of the indexing process. The statistics include:
   - Total Directories on the Server: 
-    - Displays the count of directories identified on the server, including the root directory. Some directories may be unreachably stored on the server, not all directories are fetched, and the count includes those marked with a data type '1' which represents directories on the server and the server root directories itself. 
+    - Displays the count of directories identified on the server, including the root directory. Some directories may be unreachably stored on the server, not all directories are fetched, and the count includes those marked with a data type '1' and a vaild data format accordingly, which represents directories on the server and the server root directories itself. 
   - List of Directories: 
     - If there are any directories found, a list of all directory paths on the server is printed. 
   - Total Text Files: 

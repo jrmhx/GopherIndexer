@@ -404,7 +404,7 @@ public class GopherIndexer {
      */
     public void printStatistics() {
         System.out.println("Total directories on the server: " + visited.size());
-        System.out.println("\u001B[33mNOTE\u001B[0m: This includes data fetched from the server that has a data type of '1' (directories)");
+        System.out.println("\u001B[33mNOTE\u001B[0m: This includes data fetched from the server that has a data type of '1' (directories) with a valid data format");
         System.out.println("\u001B[33mNOTE\u001B[0m: It doesn't include dictionaries that can be fetched from the external server");
         System.out.println("\u001B[33mNOTE\u001B[0m: The directories included are not guranteed to be reachable (maybe due to the server being down)");
         System.out.println("\u001B[33mNOTE\u001B[0m: It includes the server's root directory as well");
